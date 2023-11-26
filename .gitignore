@@ -1,3 +1,6 @@
 ./target
 ./CalenderEvents.zip
 ./.idea
+.idea/**
+target/**
+CalenderEvents.iml
