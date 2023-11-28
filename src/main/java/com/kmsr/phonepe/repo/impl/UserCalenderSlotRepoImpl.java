@@ -69,15 +69,18 @@ public class UserCalenderSlotRepoImpl implements UserCalenderSlotRepo {
     List<UserCalenderSlot> deleted = new ArrayList<>();
     for (String userId : userIds) {
       List<UserCalenderSlot> allByUserId = getAllByUserId(userId);
-      allByUserId.forEach(userCalenderSlot -> {
-        idMap.remove(userCalenderSlot.getId());
-        UserIdMapVal userIdMapVal = userIdTimeMap.get(userId);
-        userIdMapVal.startTimeMap.getOrDefault(userCalenderSlot.getStartTime(), new HashSet<>())
-            .remove(userCalenderSlot.getId());
-        userIdMapVal.endTimeMap.getOrDefault(userCalenderSlot.getEndTime(), new HashSet<>())
-            .remove(userCalenderSlot.getId());
-      });
-      deleted.addAll(allByUserId);
+      allByUserId.stream()
+        .filter(userCalenderSlot -> userCalenderSlot.getRefType().equals(refType)
+            && userCalenderSlot.getRefId().equals(refId))
+        .forEach(userCalenderSlot -> {
+          idMap.remove(userCalenderSlot.getId());
+          UserIdMapVal userIdMapVal = userIdTimeMap.get(userId);
+          userIdMapVal.startTimeMap.getOrDefault(userCalenderSlot.getStartTime(), new HashSet<>())
+              .remove(userCalenderSlot.getId());
+          userIdMapVal.endTimeMap.getOrDefault(userCalenderSlot.getEndTime(), new HashSet<>())
+              .remove(userCalenderSlot.getId());
+          deleted.add(userCalenderSlot);
+        });
     }
     return deleted;
   }
@@ -135,13 +138,15 @@ public class UserCalenderSlotRepoImpl implements UserCalenderSlotRepo {
     Set<String> startingBefore = userIdMapVal.startTimeMap.headMap(endTime, false)
         .values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
     // Find any booked slot that ends after the startTime we are looking for
-    Set<String> endingAfter = userIdMapVal.startTimeMap.tailMap(startTime, false)
+    Set<String> endingAfter = userIdMapVal.endTimeMap.tailMap(startTime, false)
         .values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
-    startingBefore.addAll(endingAfter);
-    return startingBefore.stream().filter(id -> {
-      UserCalenderSlot slot = idMap.get(id);
-      return startTime < slot.getEndTime() && endTime > slot.getStartTime();
-    }).collect(Collectors.toSet());
+    startingBefore.retainAll(endingAfter);
+    return startingBefore;
+//    startingBefore.addAll(endingAfter);
+//    return startingBefore.stream().filter(id -> {
+//      UserCalenderSlot slot = idMap.get(id);
+//      return startTime < slot.getEndTime() && endTime > slot.getStartTime();
+//    }).collect(Collectors.toSet());
   }
 
   private static class UserIdMapVal {

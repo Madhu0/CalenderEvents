@@ -107,7 +107,7 @@ public class EventServiceImpl implements EventService {
   private void validateCreateEventInput(String organiser, List<String> participantIds, long start,
       long end) {
     if (isNull(organiser) || isNull(participantIds)) {
-      throw new RuntimeException();
+      throw new InvalidInputException();
     }
     validateCreateEventTimes(start, end);
     ArrayList<String> userIds = new ArrayList<>(participantIds);

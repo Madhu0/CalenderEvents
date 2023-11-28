@@ -51,6 +51,7 @@ public class UserScheduleServiceImpl implements UserScheduleService {
 
   @Override
   public UserSchedule addShift(String userId, long startTime, long endTime) {
+    PreConditions.notEmpty(userId);
     return createUserSchedule(userId, startTime, endTime, Status.AVAILABLE);
   }
 
@@ -59,6 +60,7 @@ public class UserScheduleServiceImpl implements UserScheduleService {
     /*
     1. Delete the existing slots with refId as id
     2. recompute the slot for all the days where the slots are already created
+    3. refresh the conflicts
      */
     throw new UnsupportedOperationException();
   }

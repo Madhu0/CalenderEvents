@@ -5,6 +5,7 @@ import java.util.List;
 
 public interface EventParticipantService {
 
+  @SuppressWarnings("UnusedReturnValue")
   List<EventParticipant> saveEventParticipants(String eventId, List<EventParticipant> participants);
 
   List<EventParticipant> getAllByEventId(String eventId);

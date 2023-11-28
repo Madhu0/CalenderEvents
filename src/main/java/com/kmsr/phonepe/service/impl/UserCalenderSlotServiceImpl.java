@@ -10,7 +10,6 @@ import com.kmsr.phonepe.entities.UserCalenderSlot;
 import com.kmsr.phonepe.enums.CalenderSlotRefType;
 import com.kmsr.phonepe.repo.UserCalenderSlotRepo;
 import com.kmsr.phonepe.service.UserCalenderSlotService;
-import com.kmsr.phonepe.utils.Constants;
 import com.kmsr.phonepe.utils.PreConditions;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -64,18 +63,33 @@ public class UserCalenderSlotServiceImpl implements UserCalenderSlotService {
       List<String> userIds) {
     PreConditions.notEmpty(eventId);
     PreConditions.notEmpty(userIds);
-    return userCalenderSlotRepo.deleteAllByUserIdsAndRefId(userIds, CalenderSlotRefType.EVENT,
+    List<UserCalenderSlot> calenderSlots = userCalenderSlotRepo.deleteAllByUserIdsAndRefId(userIds,
+        CalenderSlotRefType.EVENT,
         eventId);
+    /**
+     * Refreshing the conflicts by the user is very costly, as it goes through every slot and checks for
+     * conflicts. Few optimisations to consider
+     * 1. Reduce the range in which conflicts are affected. For every slot, get the conflicting ones
+     * from query, which goes through the startTime and endTime indices so may instead O(n2) it
+     * would be O(nlogn)
+     * 2. If we can maintain the conflicts for which slot with a reference, then figuring out which
+     * conflicts the event deletion would affect is very easy. Since this requires changing a lot of
+     * places, ignoring for now.
+     */
+    refreshConflictsByUsers(userIds);
+    return calenderSlots;
   }
 
   @Override
   @SuppressWarnings("unused-return-types")
   public List<UserCalenderSlot> insertScheduledSlots(List<UserCalenderSlot> slots) {
+    PreConditions.notEmpty(slots);
     return userCalenderSlotRepo.addSlots(slots);
   }
 
   @Override
   public List<UserCalenderSlot> getConflicts(String userId, long startTime, long endTime) {
+    PreConditions.notEmpty(userId);
     List<UserCalenderSlot> slots = userCalenderSlotRepo.getAllInRangeByUserId(userId,
         startTime, endTime);
     return slots.stream().filter(UserCalenderSlot::isConflict).collect(Collectors.toList());
@@ -121,5 +135,36 @@ public class UserCalenderSlotServiceImpl implements UserCalenderSlotService {
         userIds, startTime, endTime);
     return conflictingSlots.stream()
         .collect(Collectors.groupingBy(UserCalenderSlot::getUserId));
+  }
+
+  /**
+   * Too costly of an operation to compare each slot of a user with another
+   * 1. The conflicts will only effect
+   * @param userIds
+   */
+  private void refreshConflictsByUsers(List<String> userIds) {
+    for (String userId:userIds) {
+      List<UserCalenderSlot> allByUserId = userCalenderSlotRepo.getAllByUserId(userId);
+      markConflicts(allByUserId);
+    }
+  }
+
+  private void markConflicts(List<UserCalenderSlot> slots) {
+    if (isNull(slots) || slots.isEmpty()) {
+      return;
+    }
+    slots.forEach(s -> s.setConflict(false));
+    for (UserCalenderSlot slot1: slots) {
+      for (UserCalenderSlot slot2: slots) {
+        if (!slot1.getId().equals(slot2.getId()) && areMeetingsConflicting(slot1, slot2)) {
+          slot1.setConflict(true);
+          slot2.setConflict(true);
+        }
+      }
+    }
+  }
+
+  private boolean areMeetingsConflicting(UserCalenderSlot slot1, UserCalenderSlot slot2) {
+    return slot1.getStartTime() < slot2.getEndTime() && slot1.getEndTime() > slot2.getStartTime();
   }
 }
